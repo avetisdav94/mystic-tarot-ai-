@@ -1,4 +1,5 @@
 import { getCardsGrouped, getCardById } from '../constants/cards/index.js';
+import { getCardImageUrl } from '../utils/card-images.js';
 import logger from '../utils/logger.js';
 
 export async function handleReference(bot, query) {
@@ -82,14 +83,16 @@ export async function handleReferenceCard(bot, query, cardId) {
     return;
   }
 
+  const imageUrl = getCardImageUrl(card.id);
+
   let text = `${card.emoji} *${card.name}*\n`;
   text += `_${card.nameEn}_\n\n`;
   
   if (card.number !== undefined) {
-    text += `🔢 Номер: ${card.number}\n`;
+    text += `🔢 Номер: ${card.number}\n\n`;
   }
   
-  text += `\n📝 *Описание:*\n${card.description}\n\n`;
+  text += `📝 *Описание:*\n${card.description}\n\n`;
   text += `🔑 *Ключевые слова:*\n${card.keywords.join(', ')}\n\n`;
   text += `⬆️ *Прямое положение:*\n${card.uprightMeaning}\n\n`;
   text += `⬇️ *Перевернутое положение:*\n${card.reversedMeaning}`;
@@ -100,13 +103,32 @@ export async function handleReferenceCard(bot, query, cardId) {
   ];
 
   try {
-    // Просто отправляем текст без изображения
-    await bot.editMessageText(text, {
-      chat_id: chatId,
-      message_id: messageId,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: keyboard }
-    });
+    // Удаляем старое сообщение
+    await bot.deleteMessage(chatId, messageId);
+    
+    // Отправляем новое с изображением
+    if (imageUrl) {
+      try {
+        await bot.sendPhoto(chatId, imageUrl, {
+          caption: text,
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } catch (photoError) {
+        // Если фото не загрузилось - отправляем текст
+        logger.warn(`Failed to send photo for ${card.id}, sending text only`);
+        await bot.sendMessage(chatId, text, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      }
+    } else {
+      // Если URL нет - только текст
+      await bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    }
   } catch (error) {
     logger.error('Error in handleReferenceCard:', error);
   }

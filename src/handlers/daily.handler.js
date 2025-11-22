@@ -12,48 +12,48 @@ export async function handleDailyCard(bot, msg) {
   try {
     await bot.sendMessage(chatId, '🔮 Вытягиваю вашу карту дня...');
 
-    // Вытягиваем случайную карту
     const card = getRandomCard();
     const spread = getSpreadById('daily');
 
-    // Получаем толкование
     const interpretation = await aiService.interpretCard(
       card, 
       spread, 
       spread.positions[0]
     );
 
-    // Сохраняем
     await db.saveSpread(userId, 'daily', 'Карта дня', [card], interpretation);
 
-    // Отправляем с изображением
     const imageUrl = getCardImageUrl(card.id);
+    const text = `🌅 *Карта дня*\n\n${card.emoji} *${card.name}*\n_${card.nameEn}_\n\n━━━━━━━━━━━━━━━\n\n${interpretation}`;
     
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '📖 Подробнее о карте', callback_data: `ref_card:${card.id}` }],
+        [{ text: '🔮 Другие расклады', callback_data: 'new_spread' }],
+        [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+      ]
+    };
+
     if (imageUrl) {
-      await bot.sendPhoto(chatId, imageUrl, {
-        caption: `🌅 *Карта дня: ${card.name}*\n\n${card.emoji} ${card.nameEn}\n\n━━━━━━━━━━━━━━━\n\n${interpretation}`,
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '📖 Подробнее о карте', callback_data: `ref_card:${card.id}` }],
-            [{ text: '🔮 Другие расклады', callback_data: 'new_spread' }],
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-          ]
-        }
-      });
-    } else {
-      await bot.sendMessage(chatId, 
-        `🌅 *Карта дня: ${card.name}*\n\n${card.emoji} ${card.nameEn}\n\n━━━━━━━━━━━━━━━\n\n${interpretation}`,
-        {
+      try {
+        await bot.sendPhoto(chatId, imageUrl, {
+          caption: text,
           parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '📖 Подробнее о карте', callback_data: `ref_card:${card.id}` }],
-              [{ text: '🔮 Другие расклады', callback_data: 'new_spread' }]
-            ]
-          }
-        }
-      );
+          reply_markup: keyboard
+        });
+      } catch (photoError) {
+        // Если фото не загрузилось - отправляем текст
+        logger.warn('Failed to send daily card photo, sending text only');
+        await bot.sendMessage(chatId, text, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+    } else {
+      await bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
     }
 
     logger.info(`Daily card sent to user ${userId}: ${card.name}`);
