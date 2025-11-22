@@ -14,15 +14,28 @@ export async function handleReference(bot, query) {
   ];
 
   try {
-    await bot.editMessageText(
-      '📖 *Справочник Таро*\n\nВыберите масть для изучения карт:',
-      {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: keyboard }
-      }
-    );
+    // Проверяем, есть ли текст в сообщении
+    if (query.message.text) {
+      await bot.editMessageText(
+        '📖 *Справочник Таро*\n\nВыберите масть для изучения карт:',
+        {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        }
+      );
+    } else {
+      // Если это фото - удаляем и отправляем новое
+      await bot.deleteMessage(chatId, messageId);
+      await bot.sendMessage(chatId,
+        '📖 *Справочник Таро*\n\nВыберите масть для изучения карт:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: keyboard }
+        }
+      );
+    }
   } catch (error) {
     logger.error('Error in handleReference:', error);
   }
@@ -59,16 +72,41 @@ export async function handleReferenceSuit(bot, query, suit) {
   keyboard.push([{ text: '◀️ К мастям', callback_data: 'reference' }]);
 
   try {
-    await bot.editMessageText(
-      `${suitNames[suit]}\n\nВсего карт: ${cards.length}\n\nВыберите карту для подробной информации:`,
-      {
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: keyboard }
-      }
-    );
+    // Проверяем тип сообщения
+    if (query.message.photo) {
+      // Если это фото - удаляем и отправляем новое текстовое
+      await bot.deleteMessage(chatId, messageId);
+      await bot.sendMessage(chatId,
+        `${suitNames[suit]}\n\nВсего карт: ${cards.length}\n\nВыберите карту для подробной информации:`,
+        {
+          reply_markup: { inline_keyboard: keyboard }
+        }
+      );
+    } else {
+      // Если это текст - просто редактируем
+      await bot.editMessageText(
+        `${suitNames[suit]}\n\nВсего карт: ${cards.length}\n\nВыберите карту для подробной информации:`,
+        {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: { inline_keyboard: keyboard }
+        }
+      );
+    }
   } catch (error) {
     logger.error('Error in handleReferenceSuit:', error);
+    
+    // Fallback: если не получилось отредактировать - отправляем новое
+    try {
+      await bot.sendMessage(chatId,
+        `${suitNames[suit]}\n\nВсего карт: ${cards.length}\n\nВыберите карту для подробной информации:`,
+        {
+          reply_markup: { inline_keyboard: keyboard }
+        }
+      );
+    } catch (fallbackError) {
+      logger.error('Error in fallback:', fallbackError);
+    }
   }
 }
 
@@ -103,10 +141,10 @@ export async function handleReferenceCard(bot, query, cardId) {
   ];
 
   try {
-    // Удаляем старое сообщение
+    // Всегда удаляем старое сообщение и отправляем новое
     await bot.deleteMessage(chatId, messageId);
     
-    // Отправляем новое с изображением
+    // Отправляем новое с изображением или без
     if (imageUrl) {
       try {
         await bot.sendPhoto(chatId, imageUrl, {
@@ -131,5 +169,15 @@ export async function handleReferenceCard(bot, query, cardId) {
     }
   } catch (error) {
     logger.error('Error in handleReferenceCard:', error);
+    
+    // Fallback - отправляем новое сообщение
+    try {
+      await bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } catch (fallbackError) {
+      logger.error('Error in fallback:', fallbackError);
+    }
   }
 }
