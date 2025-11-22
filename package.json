@@ -1,0 +1,35 @@
+{
+  "name": "tarot-bot",
+  "version": "1.0.0",
+  "description": "AI-powered Tarot reading Telegram bot",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "tarot",
+    "ai",
+    "groq"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "groq-sdk": "^0.3.2",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "dayjs": "^1.11.10",
+    "joi": "^17.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

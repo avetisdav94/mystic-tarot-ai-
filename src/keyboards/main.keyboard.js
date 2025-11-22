@@ -1,0 +1,32 @@
+export function getMainKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '🔮 Новый расклад', callback_data: 'new_spread' }
+        ],
+         [
+          { text: '📖 Справочник карт', callback_data: 'reference' } // НОВОЕ!
+        ],
+        [
+          { text: '📚 История', callback_data: 'history' },
+          { text: '📊 Статистика', callback_data: 'stats' }
+        ],
+        [
+          { text: '💎 Премиум', callback_data: 'premium' },
+          { text: 'ℹ️ Помощь', callback_data: 'help' }
+        ]
+      ]
+    }
+  };
+}
+
+export function getBackToMainButton() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+      ]
+    }
+  };
+}
