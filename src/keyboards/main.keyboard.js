@@ -5,11 +5,14 @@ export function getMainKeyboard() {
         [
           { text: '🔮 Новый расклад', callback_data: 'new_spread' }
         ],
-         [
-          { text: '📖 Справочник карт', callback_data: 'reference' } // НОВОЕ!
+        [
+          { text: '🌅 Карта дня', callback_data: 'daily_card' }
         ],
         [
-          { text: '📚 История', callback_data: 'history' },
+          { text: '📖 Справочник карт', callback_data: 'reference' }
+        ],
+        [
+          { text: '📚 Мои расклады', callback_data: 'history' },
           { text: '📊 Статистика', callback_data: 'stats' }
         ],
         [

@@ -151,10 +151,17 @@ export function createBot() {
         await bot.answerCallbackQuery(query.id);
       }
       
+      
       else if (data === 'help') {
         await handleHelp(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
+      // После else if (data === 'help')
+else if (data === 'daily_card') {
+  await bot.answerCallbackQuery(query.id);
+  const { handleDailyCard } = await import('./handlers/daily.handler.js');
+  await handleDailyCard(bot, query.message);
+}
       
       else if (data === 'new_spread') {
         await handleNewSpread(bot, query);

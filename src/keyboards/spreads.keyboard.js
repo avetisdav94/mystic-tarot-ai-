@@ -3,27 +3,27 @@ import { SPREADS, getFreeSpread, getPremiumSpreads } from '../constants/spreads.
 export function getSpreadsKeyboard() {
   const keyboard = [];
 
-  // Бесплатные расклады
-  keyboard.push([{ text: '🆓 БЕСПЛАТНЫЕ РАСКЛАДЫ', callback_data: 'ignore' }]);
+  // Заголовок бесплатных
+  keyboard.push([{ text: '━━━━ 🆓 БЕСПЛАТНЫЕ ━━━━', callback_data: 'ignore' }]);
   
   getFreeSpread().forEach(spread => {
     keyboard.push([{
-      text: `${spread.emoji} ${spread.name} (${spread.cardsCount} карт)`,
+      text: `${spread.emoji} ${spread.name}`,
       callback_data: `select_spread:${spread.id}`
     }]);
   });
 
-  // Премиум расклады
-  keyboard.push([{ text: '💎 ПРЕМИУМ РАСКЛАДЫ', callback_data: 'ignore' }]);
+  // Заголовок премиум
+  keyboard.push([{ text: '━━━━ 💎 ПРЕМИУМ ━━━━', callback_data: 'ignore' }]);
   
   getPremiumSpreads().forEach(spread => {
     keyboard.push([{
-      text: `${spread.emoji} ${spread.name} - ${spread.price} ${spread.currency}`,
+      text: `${spread.emoji} ${spread.name} — ${spread.price} ${spread.currency}`,
       callback_data: `select_spread:${spread.id}`
     }]);
   });
 
-  keyboard.push([{ text: '◀️ Назад', callback_data: 'main_menu' }]);
+  keyboard.push([{ text: '◀️ Главное меню', callback_data: 'main_menu' }]);
 
   return {
     reply_markup: {
@@ -37,8 +37,13 @@ export function getSpreadConfirmKeyboard(spreadId) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '✅ Начать', callback_data: `start_spread:${spreadId}` },
-          { text: '◀️ Назад', callback_data: 'new_spread' }
+          { text: '✅ Начать расклад', callback_data: `start_spread:${spreadId}` }
+        ],
+        [
+          { text: '◀️ Выбрать другой', callback_data: 'new_spread' }
+        ],
+        [
+          { text: '🏠 Главное меню', callback_data: 'main_menu' }
         ]
       ]
     }
