@@ -1,12 +1,20 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Загружаем .env только в development (в Railway его нет)
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
-// Выводим для проверки (удали потом!)
-console.log('🔍 Проверка переменных окружения:');
-console.log('TELEGRAM_BOT_TOKEN:', process.env.TELEGRAM_BOT_TOKEN ? '✅ Найден' : '❌ НЕ найден');
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Найден' : '❌ НЕ найден');
-console.log('GROQ_API_KEY:', process.env.GROQ_API_KEY ? '✅ Найден' : '❌ НЕ найден');
+// Проверяем переменные
+const requiredVars = ['TELEGRAM_BOT_TOKEN'];
+
+for (const varName of requiredVars) {
+  if (!process.env[varName]) {
+    console.error(`❌ Missing required environment variable: ${varName}`);
+    console.error('Available variables:', Object.keys(process.env).filter(k => k.includes('TELEGRAM') || k.includes('SUPABASE') || k.includes('GROQ')));
+    process.exit(1);
+  }
+}
 
 export const config = {
   telegram: {
@@ -25,12 +33,4 @@ export const config = {
   isProduction: process.env.NODE_ENV === 'production',
 };
 
-// Простая проверка обязательных переменных
-if (!config.telegram.token) {
-  console.error('❌ TELEGRAM_BOT_TOKEN не найден в .env файле!');
-  console.error('📁 Проверь, что файл .env находится в корне проекта');
-  console.error('📝 Формат: TELEGRAM_BOT_TOKEN=твой_токен');
-  process.exit(1);
-}
-
-console.log('✅ Конфигурация загружена успешно!');
+console.log('✅ Config loaded successfully');
