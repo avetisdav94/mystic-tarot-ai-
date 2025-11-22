@@ -227,3 +227,67 @@ export const SPREADS = {
     ]
   }
 };
+
+// ========== ФУНКЦИИ-ПОМОЩНИКИ ==========
+
+/**
+ * Получить все бесплатные расклады
+ * @returns {Array} Массив бесплатных раскладов
+ */
+export function getFreeSpread() {
+  return Object.values(SPREADS).filter(spread => spread.isFree);
+}
+
+/**
+ * Получить все премиум расклады
+ * @returns {Array} Массив премиум раскладов
+ */
+export function getPremiumSpreads() {
+  return Object.values(SPREADS).filter(spread => !spread.isFree);
+}
+
+/**
+ * Получить расклад по ID
+ * @param {string} id - ID расклада
+ * @returns {Object|undefined} Объект расклада или undefined
+ */
+export function getSpreadById(id) {
+  return SPREADS[id];
+}
+
+/**
+ * Получить все расклады
+ * @returns {Object} Объект со всеми раскладами
+ */
+export function getAllSpreads() {
+  return SPREADS;
+}
+
+/**
+ * Получить расклады определенного типа
+ * @param {boolean} isFree - true для бесплатных, false для премиум
+ * @returns {Array} Массив раскладов
+ */
+export function getSpreadsByType(isFree) {
+  return Object.values(SPREADS).filter(spread => spread.isFree === isFree);
+}
+
+/**
+ * Проверить, является ли расклад бесплатным
+ * @param {string} spreadId - ID расклада
+ * @returns {boolean} true если бесплатный
+ */
+export function isSpreadFree(spreadId) {
+  const spread = SPREADS[spreadId];
+  return spread ? spread.isFree : false;
+}
+
+/**
+ * Получить цену расклада
+ * @param {string} spreadId - ID расклада
+ * @returns {number|null} Цена или null если бесплатный
+ */
+export function getSpreadPrice(spreadId) {
+  const spread = SPREADS[spreadId];
+  return spread && !spread.isFree ? spread.price : null;
+}
