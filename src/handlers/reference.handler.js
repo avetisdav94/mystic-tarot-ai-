@@ -1,5 +1,5 @@
 import { getCardsGrouped, getCardById } from '../constants/cards/index.js';
-import { SUIT_TYPES } from '../constants/cards/index.js';
+import { getCardImageUrl } from '../utils/card-images.js';
 import logger from '../utils/logger.js';
 
 export async function handleReference(bot, query) {
@@ -48,7 +48,6 @@ export async function handleReferenceSuit(bot, query, suit) {
     pentacles: '🪙 Пентакли'
   };
 
-  // Создаем клавиатуру с картами
   const keyboard = [];
   cards.forEach(card => {
     keyboard.push([{
@@ -84,6 +83,8 @@ export async function handleReferenceCard(bot, query, cardId) {
     return;
   }
 
+  const imageUrl = getCardImageUrl(card.id);
+
   let text = `${card.emoji} *${card.name}*\n`;
   text += `_${card.nameEn}_\n\n`;
   
@@ -102,12 +103,20 @@ export async function handleReferenceCard(bot, query, cardId) {
   ];
 
   try {
-    await bot.editMessageText(text, {
-      chat_id: chatId,
-      message_id: messageId,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: keyboard }
-    });
+    await bot.deleteMessage(chatId, messageId);
+    
+    if (imageUrl) {
+      await bot.sendPhoto(chatId, imageUrl, {
+        caption: text,
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    } else {
+      await bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    }
   } catch (error) {
     logger.error('Error in handleReferenceCard:', error);
   }

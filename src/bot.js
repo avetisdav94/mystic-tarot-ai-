@@ -11,7 +11,12 @@ import {
   handleCardSelection,
   handleCancelSpread
 } from './handlers/spread.handler.js';
-import { handleHistory, handleViewSpread, handleStats } from './handlers/history.handler.js';
+import { 
+  handleHistory, 
+  handleViewSpread, 
+  handleStats as handleUserStats,
+  handleDeleteSpread
+} from './handlers/history.handler.js';
 import { 
   handlePremium, 
   handleBuySubscription,
@@ -22,6 +27,11 @@ import {
   handleReferenceSuit,
   handleReferenceCard
 } from './handlers/reference.handler.js';
+import { handleDailyCard } from './handlers/daily.handler.js';
+import { handleStats, handleBroadcast } from './handlers/admin.handler.js';
+
+// Для inline mode
+import { ALL_CARDS } from './constants/cards/index.js';
 
 export function createBot() {
   const bot = new TelegramBot(config.telegram.token, { polling: true });
@@ -42,6 +52,11 @@ export function createBot() {
     bot.sendMessage(msg.chat.id, 'Используйте /start для начала работы с ботом 🔮');
   });
 
+  bot.onText(/\/daily/, (msg) => {
+    logger.info(`/daily command from user ${msg.from.id}`);
+    handleDailyCard(bot, msg);
+  });
+
   bot.onText(/\/reference/, (msg) => {
     logger.info(`/reference command from user ${msg.from.id}`);
     bot.sendMessage(msg.chat.id, 'Открываю справочник карт...', {
@@ -51,6 +66,68 @@ export function createBot() {
         ]
       }
     });
+  });
+
+  // Админ команды
+  bot.onText(/\/stats/, (msg) => {
+    logger.info(`/stats command from user ${msg.from.id}`);
+    handleStats(bot, msg);
+  });
+
+  bot.onText(/\/broadcast (.+)/, (msg) => {
+    logger.info(`/broadcast command from user ${msg.from.id}`);
+    handleBroadcast(bot, msg);
+  });
+
+  // ============================================
+  // INLINE MODE (поиск карт)
+  // ============================================
+  
+  bot.on('inline_query', async (query) => {
+    const searchTerm = query.query.toLowerCase();
+    
+    if (!searchTerm) {
+      // Показываем популярные карты
+      const popularCards = ALL_CARDS.slice(0, 10);
+      const results = popularCards.map(card => ({
+        type: 'article',
+        id: card.id,
+        title: card.name,
+        description: card.keywords.join(', '),
+        input_message_content: {
+          message_text: `${card.emoji} *${card.name}*\n_${card.nameEn}_\n\n📝 ${card.description}\n\n🔑 Ключевые слова: ${card.keywords.join(', ')}`,
+          parse_mode: 'Markdown'
+        }
+      }));
+      
+      await bot.answerInlineQuery(query.id, results);
+      return;
+    }
+
+    // Поиск карт
+    const cards = ALL_CARDS.filter(card => 
+      card.name.toLowerCase().includes(searchTerm) ||
+      card.nameEn.toLowerCase().includes(searchTerm) ||
+      card.keywords.some(kw => kw.includes(searchTerm))
+    ).slice(0, 20);
+
+    if (cards.length === 0) {
+      await bot.answerInlineQuery(query.id, []);
+      return;
+    }
+
+    const results = cards.map(card => ({
+      type: 'article',
+      id: card.id,
+      title: card.name,
+      description: card.keywords.join(', '),
+      input_message_content: {
+        message_text: `${card.emoji} *${card.name}*\n_${card.nameEn}_\n\n📝 ${card.description}\n\n🔑 Ключевые слова: ${card.keywords.join(', ')}`,
+        parse_mode: 'Markdown'
+      }
+    }));
+
+    await bot.answerInlineQuery(query.id, results);
   });
 
   // ============================================
@@ -64,45 +141,38 @@ export function createBot() {
     logger.info(`Callback query from user ${userId}: ${data}`);
 
     try {
-      // ========== ИГНОРИРУЕМЫЕ КНОПКИ ==========
       if (data === 'ignore') {
         await bot.answerCallbackQuery(query.id);
         return;
       }
 
-      // ========== ГЛАВНОЕ МЕНЮ ==========
       else if (data === 'main_menu') {
         await handleMainMenu(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== ПОМОЩЬ ==========
       else if (data === 'help') {
         await handleHelp(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== НОВЫЙ РАСКЛАД ==========
       else if (data === 'new_spread') {
         await handleNewSpread(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== ВЫБОР РАСКЛАДА ==========
       else if (data.startsWith('select_spread:')) {
         const spreadId = data.split(':')[1];
         await handleSpreadSelection(bot, query, spreadId);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== НАЧАТЬ РАСКЛАД ==========
       else if (data.startsWith('start_spread:')) {
         const spreadId = data.split(':')[1];
         await handleStartSpread(bot, query, spreadId);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== ВЫБОР КАРТЫ ==========
       else if (data.startsWith('card_selected:')) {
         const parts = data.split(':');
         const spreadId = parts[1];
@@ -110,7 +180,6 @@ export function createBot() {
         await handleCardSelection(bot, query, spreadId, cardId);
       }
 
-      // ========== ПАГИНАЦИЯ КАРТ ==========
       else if (data.startsWith('cards_page:')) {
         const parts = data.split(':');
         const spreadId = parts[1];
@@ -122,15 +191,11 @@ export function createBot() {
         
         await bot.editMessageReplyMarkup(
           getCardsKeyboard(page, spreadId).reply_markup,
-          {
-            chat_id: chatId,
-            message_id: messageId
-          }
+          { chat_id: chatId, message_id: messageId }
         );
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== МЛАДШИЕ АРКАНЫ ==========
       else if (data.startsWith('minor_arcana:')) {
         const spreadId = data.split(':')[1];
         const { getMinorArcanaKeyboard } = await import('./keyboards/cards.keyboard.js');
@@ -145,7 +210,6 @@ export function createBot() {
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== ПЕРЕКЛЮЧЕНИЕ МАСТИ ==========
       else if (data.startsWith('suit:')) {
         const parts = data.split(':');
         const spreadId = parts[1];
@@ -157,15 +221,11 @@ export function createBot() {
         
         await bot.editMessageReplyMarkup(
           getMinorArcanaKeyboard(spreadId, suit).reply_markup,
-          {
-            chat_id: chatId,
-            message_id: messageId
-          }
+          { chat_id: chatId, message_id: messageId }
         );
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== К СТАРШИМ АРКАНАМ ==========
       else if (data.startsWith('major_arcana:')) {
         const spreadId = data.split(':')[1];
         const { getCardsKeyboard } = await import('./keyboards/cards.keyboard.js');
@@ -180,38 +240,37 @@ export function createBot() {
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== ОТМЕНА РАСКЛАДА ==========
       else if (data === 'cancel_spread') {
         await handleCancelSpread(bot, query);
         await bot.answerCallbackQuery(query.id, { text: '🏠 Возврат в меню' });
       }
       
-      // ========== ИСТОРИЯ ==========
       else if (data === 'history') {
         await handleHistory(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== ПРОСМОТР РАСКЛАДА ==========
       else if (data.startsWith('view_spread:')) {
         const spreadId = data.split(':')[1];
         await handleViewSpread(bot, query, spreadId);
         await bot.answerCallbackQuery(query.id);
       }
+
+      else if (data.startsWith('delete_spread:')) {
+        const spreadId = data.split(':')[1];
+        await handleDeleteSpread(bot, query, spreadId);
+      }
       
-      // ========== СТАТИСТИКА ==========
       else if (data === 'stats') {
-        await handleStats(bot, query);
+        await handleUserStats(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== ПРЕМИУМ ==========
       else if (data === 'premium') {
         await handlePremium(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
       
-      // ========== ПОКУПКА ПОДПИСКИ ==========
       else if (data.startsWith('buy_subscription:')) {
         const parts = data.split(':');
         const months = parseInt(parts[1]);
@@ -219,33 +278,28 @@ export function createBot() {
         await handleBuySubscription(bot, query, months, stars);
       }
 
-      // ========== ПОКУПКА РАСКЛАДА ==========
       else if (data.startsWith('buy_spread:')) {
         const spreadId = data.split(':')[1];
         await handleBuySpread(bot, query, spreadId);
       }
 
-      // ========== СПРАВОЧНИК ==========
       else if (data === 'reference') {
         await handleReference(bot, query);
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== СПРАВОЧНИК ПО МАСТИ ==========
       else if (data.startsWith('ref_') && !data.includes(':')) {
         const suit = data.replace('ref_', '');
         await handleReferenceSuit(bot, query, suit);
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== КОНКРЕТНАЯ КАРТА В СПРАВОЧНИКЕ ==========
       else if (data.startsWith('ref_card:')) {
         const cardId = data.split(':')[1];
         await handleReferenceCard(bot, query, cardId);
         await bot.answerCallbackQuery(query.id);
       }
 
-      // ========== ТЕСТОВЫЙ ПРЕМИУМ ==========
       else if (data.startsWith('subscribe:')) {
         const months = parseInt(data.split(':')[1]);
         const { db } = await import('./services/database.service.js');
@@ -271,12 +325,9 @@ export function createBot() {
         );
       }
       
-      // ========== НЕИЗВЕСТНАЯ КОМАНДА ==========
       else {
         logger.warn(`Unknown callback data: ${data}`);
-        await bot.answerCallbackQuery(query.id, {
-          text: '❓ Неизвестная команда'
-        });
+        await bot.answerCallbackQuery(query.id, { text: '❓ Неизвестная команда' });
       }
       
     } catch (error) {
@@ -411,7 +462,51 @@ export function createBot() {
       
       await bot.sendMessage(chatId,
         `⚠️ Оплата получена, но возникла техническая ошибка.\n\n` +
-        `Пожалуйста, обратитесь в поддержку: @your_support`
+        `Пожалуйста, обратитесь в поддержку`
+      );
+    }
+  });
+
+  // ============================================
+  // ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ
+  // ============================================
+  
+  bot.on('message', (msg) => {
+    if (msg.text && msg.text.startsWith('/')) {
+      return;
+    }
+
+    if (msg.text && !msg.successful_payment) {
+      const text = msg.text.toLowerCase();
+
+      // Реакции на позитив
+      if (text.includes('спасибо') || text.includes('благодарю')) {
+        bot.sendMessage(msg.chat.id, '🙏 Пожалуйста! Рад помочь! ✨');
+        return;
+      }
+
+      if (text.includes('привет') || text.includes('здравствуй')) {
+        bot.sendMessage(msg.chat.id, '👋 Привет! Используй /start для работы с ботом 🔮');
+        return;
+      }
+
+      if (text.includes('помощь') || text.includes('help')) {
+        bot.sendMessage(msg.chat.id, 'ℹ️ Используй /help для получения помощи');
+        return;
+      }
+
+      // Общий ответ
+      logger.info(`Text message from user ${msg.from.id}: ${msg.text}`);
+      
+      bot.sendMessage(msg.chat.id, 
+        'Используйте кнопки меню или команду /start 🔮',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            ]
+          }
+        }
       );
     }
   });
@@ -426,27 +521,6 @@ export function createBot() {
 
   bot.on('error', (error) => {
     logger.error('Bot error:', error);
-  });
-
-  bot.on('message', (msg) => {
-    if (msg.text && msg.text.startsWith('/')) {
-      return;
-    }
-
-    if (msg.text && !msg.successful_payment) {
-      logger.info(`Text message from user ${msg.from.id}: ${msg.text}`);
-      
-      bot.sendMessage(msg.chat.id, 
-        'Используйте кнопки меню или команду /start 🔮',
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-            ]
-          }
-        }
-      );
-    }
   });
 
   logger.info('All bot handlers registered');

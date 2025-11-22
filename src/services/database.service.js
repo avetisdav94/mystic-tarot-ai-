@@ -72,17 +72,10 @@ class DatabaseService {
 
   async incrementUserSpreads(userId) {
     try {
-      const { error } = await supabase.rpc('increment_spreads', {
-        user_id: userId
+      const user = await this.getUser(userId);
+      await this.updateUser(userId, {
+        total_spreads: (user.total_spreads || 0) + 1
       });
-
-      if (error) {
-        // Если функции нет, делаем вручную
-        const user = await this.getUser(userId);
-        await this.updateUser(userId, {
-          total_spreads: (user.total_spreads || 0) + 1
-        });
-      }
     } catch (error) {
       logger.error('Error incrementing spreads:', error);
     }
@@ -186,6 +179,25 @@ class DatabaseService {
     }
   }
 
+  async deleteSpread(userId, spreadId) {
+    try {
+      const { error } = await supabase
+        .from('user_spreads')
+        .delete()
+        .eq('id', spreadId)
+        .eq('user_id', userId); // Безопасность: только свои расклады
+
+      if (error) throw error;
+      
+      await this.logEvent(userId, 'spread_deleted', { spread_id: spreadId });
+      logger.info(`Spread deleted: ${spreadId} by user ${userId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error deleting spread:', error);
+      return false;
+    }
+  }
+
   // ============ ТРАНЗАКЦИИ ============
 
   async createTransaction(userId, amount, currency, metadata = {}) {
@@ -262,7 +274,6 @@ class DatabaseService {
         .select('cards')
         .eq('user_id', userId);
 
-      // Подсчет самой частой карты
       const cardFrequency = {};
       spreads?.forEach(spread => {
         spread.cards.forEach(card => {
@@ -281,6 +292,91 @@ class DatabaseService {
     } catch (error) {
       logger.error('Error getting user stats:', error);
       return null;
+    }
+  }
+
+  async getGlobalStats() {
+    try {
+      // Всего пользователей
+      const { count: totalUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+
+      // Премиум пользователей
+      const { count: premiumUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_premium', true)
+        .gte('premium_until', new Date().toISOString());
+
+      // Всего раскладов
+      const { count: totalSpreads } = await supabase
+        .from('user_spreads')
+        .select('*', { count: 'exact', head: true });
+
+      // Новые пользователи сегодня
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const { count: todayNewUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today.toISOString());
+
+      // Расклады сегодня
+      const { count: todaySpreads } = await supabase
+        .from('user_spreads')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today.toISOString());
+
+      // Популярный расклад
+      const { data: popularSpread } = await supabase
+        .from('user_spreads')
+        .select('spread_name')
+        .limit(1000);
+
+      const spreadCounts = {};
+      popularSpread?.forEach(s => {
+        spreadCounts[s.spread_name] = (spreadCounts[s.spread_name] || 0) + 1;
+      });
+
+      const mostPopular = Object.entries(spreadCounts)
+        .sort((a, b) => b[1] - a[1])[0];
+
+      return {
+        totalUsers: totalUsers || 0,
+        premiumUsers: premiumUsers || 0,
+        totalSpreads: totalSpreads || 0,
+        averageSpreadsPerUser: totalUsers > 0 ? (totalSpreads / totalUsers).toFixed(1) : 0,
+        mostPopularSpread: mostPopular ? mostPopular[0] : null,
+        todayNewUsers: todayNewUsers || 0,
+        todaySpreads: todaySpreads || 0,
+      };
+    } catch (error) {
+      logger.error('Error getting global stats:', error);
+      return {
+        totalUsers: 0,
+        premiumUsers: 0,
+        totalSpreads: 0,
+        averageSpreadsPerUser: 0,
+        mostPopularSpread: null,
+        todayNewUsers: 0,
+        todaySpreads: 0,
+      };
+    }
+  }
+
+  async getAllUsers() {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      logger.error('Error getting all users:', error);
+      return [];
     }
   }
 }
